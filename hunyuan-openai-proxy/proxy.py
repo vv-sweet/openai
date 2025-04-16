@@ -1,47 +1,21 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
-import requests
 import os
+from openai import OpenAI
 
 app = FastAPI()
 
-HUNYUAN_API_KEY = os.environ.get("HUNYUAN_API_KEY")
-HUNYUAN_URL = "https://api.hunyuan.cloud.tencent.com/v1/chat/completions"
-
-class Message(BaseModel):
-    role: str
-    content: str
-
-class OpenAIChatRequest(BaseModel):
-    model: str
-    messages: list[Message]
+client = OpenAI(
+    api_key=os.environ.get("HUNYUAN_API_KEY"),
+    base_url="https://api.hunyuan.cloud.tencent.com/v1"
+)
 
 @app.post("/v1/chat/completions")
-async def chat_completion(request: OpenAIChatRequest):
-    headers = {
-        "Authorization": f"Bearer {HUNYUAN_API_KEY}",
-        "Content-Type": "application/json",
-    }
+async def chat(request: dict):
+    messages = request.get("messages", [])
+    model = request.get("model", "hunyuan-turbos-latest")
 
-    payload = {
-        "model": request.model,
-        "messages": [m.dict() for m in request.messages],
-        "enable_enhancement": True,
-    }
-
-    resp = requests.post(HUNYUAN_URL, json=payload, headers=headers)
-    resp_json = resp.json()
-
-    return {
-        "id": "chatcmpl-fakeid",
-        "object": "chat.completion",
-        "choices": [{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": resp_json["choices"][0]["message"]["content"]
-            },
-            "finish_reason": "stop"
-        }],
-        "usage": resp_json.get("usage", {})
-    }
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+    )
+    return response
